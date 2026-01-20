@@ -40,8 +40,9 @@ if [ "$MODE" = "release" ] || [ "$MODE" = "package" ]; then
     chmod +x "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
     
     # Copy resources
-    if [ -d "Resources/Assets.xcassets" ]; then
-        cp -R "Resources/Assets.xcassets" "$APP_BUNDLE/Contents/Resources/"
+    if [ -f "Resources/Assets.xcassets/AppIcon.icns" ]; then
+        cp "Resources/Assets.xcassets/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/"
+        echo "✓ App icon copied"
     fi
     
     # Create Info.plist
