@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import ServiceManagement
 
 /// 设置存储 - 管理用户设置的持久化
 class SettingsStore: ObservableObject {
@@ -102,7 +103,20 @@ class SettingsStore: ObservableObject {
     // MARK: - Private Methods
     
     private func configureLaunchAtLogin(_ enabled: Bool) {
-        // TODO: 在 Phase 8 实现 SMAppService 开机自启
-        print("🚀 Launch at login: \(enabled)")
-    }
+        if #available(macOS 13.0, *) {
+            do {
+                if enabled {
+                    try SMAppService.mainApp.register()
+                    print("🚀 Launch at login enabled")
+                } else {
+                    try SMAppService.mainApp.unregister()
+                    print("🚫 Launch at login disabled")
+                }
+            } catch {
+                print("❌ Failed to configure launch at login: \(error.localizedDescription)")
+            }
+        } else {
+            // macOS 12 及更早版本的兼容处理
+            print("⚠️ Launch at login requires macOS 13+")
+        }    }
 }

@@ -42,6 +42,7 @@ class TimerEngine: ObservableObject {
     
     private var timer: Timer?
     private var activityMonitor: ActivityMonitor?
+    private var settingsStore: SettingsStore?
     private var cancellables = Set<AnyCancellable>()
     
     // 用于保存暂停时的进度
@@ -53,8 +54,9 @@ class TimerEngine: ObservableObject {
     
     // MARK: - Lifecycle
     
-    init(activityMonitor: ActivityMonitor? = nil) {
+    init(activityMonitor: ActivityMonitor? = nil, settingsStore: SettingsStore? = nil) {
         self.activityMonitor = activityMonitor
+        self.settingsStore = settingsStore
         
         // 开发模式：使用短间隔
         if Self.developmentMode {
@@ -62,9 +64,20 @@ class TimerEngine: ObservableObject {
             breakDurationSeconds = 8  // 8 秒休息
             snoozeDurationSeconds = 10  // 10 秒 snooze
             print("🛠️ DEVELOPMENT MODE: Using short intervals (15s alert, 8s break, 10s snooze)")
+        } else if let settings = settingsStore {
+            // 生产模式：使用设置的间隔
+            intervalSeconds = settings.intervalMinutes * 60
+            breakDurationSeconds = settings.breakSeconds
+            print("⚙️ Using settings: \(settings.intervalMinutes)min interval, \(settings.breakSeconds)s break")
+        }
+        
+        // 同步 breaksToday 从 SettingsStore
+        if let settings = settingsStore {
+            breaksToday = settings.breaksToday
         }
         
         setupActivityObserver()
+        setupSettingsObserver()
         print("⏱️ TimerEngine initialized")
     }
     
@@ -195,6 +208,35 @@ class TimerEngine: ObservableObject {
             .store(in: &cancellables)
     }
     
+    /// 设置设置变化监听
+    private func setupSettingsObserver() {
+        guard let settings = settingsStore else { return }
+        
+        // 监听 interval 变化（仅在非开发模式下）
+        if !Self.developmentMode {
+            settings.$intervalMinutes
+                .sink { [weak self] minutes in
+                    guard let self = self else { return }
+                    self.intervalSeconds = minutes * 60
+                    print("⚙️ Interval updated to \(minutes) minutes")
+                    // 如果当前正在运行，需要重新计算
+                    if case .running(let activeSeconds, _) = self.state {
+                        self.state = .running(activeSeconds: activeSeconds, targetSeconds: self.intervalSeconds)
+                    }
+                }
+                .store(in: &cancellables)
+            
+            // 监听 break duration 变化
+            settings.$breakSeconds
+                .sink { [weak self] seconds in
+                    guard let self = self else { return }
+                    self.breakDurationSeconds = seconds
+                    print("⚙️ Break duration updated to \(seconds) seconds")
+                }
+                .store(in: &cancellables)
+        }
+    }
+    
     /// 处理活跃状态变化
     private func handleActivityStateChange(_ activityState: ActivityMonitor.ActivityState) {
         switch state {
@@ -282,6 +324,10 @@ class TimerEngine: ObservableObject {
     private func completeBreak() {
         breaksToday += 1
         state = .breakCompleted
+        
+        // 记录到 SettingsStore 进行持久化
+        settingsStore?.recordBreak()
+        
         print("✅ Break completed! Total today: \(breaksToday)")
         
         // 1秒后重置周期

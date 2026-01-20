@@ -17,8 +17,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 初始化 Activity Monitor
         activityMonitor = ActivityMonitor()
         
-        // 初始化 Timer Engine (与 Activity Monitor 关联)
-        timerEngine = TimerEngine(activityMonitor: activityMonitor)
+        // 初始化 Timer Engine (与 Activity Monitor 和 SettingsStore 关联)
+        timerEngine = TimerEngine(activityMonitor: activityMonitor, settingsStore: settingsStore)
         
         // 初始化 Overlay Window Controller
         overlayWindowController = OverlayWindowController()
