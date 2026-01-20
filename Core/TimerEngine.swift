@@ -147,6 +147,10 @@ class TimerEngine: ObservableObject {
             return targetSeconds - activeSeconds
         case .paused:
             return intervalSeconds - currentActiveSeconds
+        case .snoozing(let untilDate, _):
+            // 计算 snooze 剩余时间
+            let remaining = untilDate.timeIntervalSinceNow
+            return max(0, Int(remaining))
         default:
             return nil
         }
