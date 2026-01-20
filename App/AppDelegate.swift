@@ -5,11 +5,15 @@ import Combine
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBarController: MenuBarController?
     private var activityMonitor: ActivityMonitor?
+    private var timerEngine: TimerEngine?
     private var cancellables = Set<AnyCancellable>()
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 初始化 Activity Monitor
         activityMonitor = ActivityMonitor()
+        
+        // 初始化 Timer Engine (与 Activity Monitor 关联)
+        timerEngine = TimerEngine(activityMonitor: activityMonitor)
         
         // 监听活跃状态变化
         activityMonitor?.$currentState
@@ -18,15 +22,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
         
+        // 监听计时器状态变化
+        timerEngine?.$state
+            .sink { [weak self] state in
+                self?.handleTimerStateChange(state)
+            }
+            .store(in: &cancellables)
+        
         // 初始化 Menu Bar Controller
         menuBarController = MenuBarController()
         menuBarController?.activityMonitor = activityMonitor
+        menuBarController?.timerEngine = timerEngine
         
         // 隐藏主窗口（如果有）
         NSApplication.shared.setActivationPolicy(.accessory)
         
+        // 启动计时器
+        timerEngine?.start()
+        
         print("✅ MoveApp launched successfully")
         print("👁️ ActivityMonitor is now active")
+        print("⏱️ TimerEngine started")
         
         // 打印当前系统 idle 时间（调试用）
         if let monitor = activityMonitor {
@@ -36,6 +52,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationWillTerminate(_ notification: Notification) {
+        timerEngine?.stop()
         print("👋 MoveApp terminated")
     }
     
@@ -51,6 +68,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             print("🟢 User is ACTIVE")
         case .idle:
             print("🟡 User is IDLE")
+        }
+    }
+    
+    // MARK: - Timer State Handler
+    
+    private func handleTimerStateChange(_ state: TimerEngine.TimerState) {
+        switch state {
+        case .running(let activeSeconds, let targetSeconds):
+            let remaining = targetSeconds - activeSeconds
+            if activeSeconds % 60 == 0 {  // 每分钟打印一次，避免日志过多
+                print("⏱️ Timer running: \(activeSeconds)s / \(targetSeconds)s (remaining: \(remaining)s)")
+            }
+        case .paused(let reason):
+            print("⏸️ Timer paused: \(reason)")
+        case .alerting(let snoozeCount):
+            print("🚨 ALERT! (snooze count: \(snoozeCount))")
+        case .breakRunning(let remainingSeconds):
+            if remainingSeconds % 10 == 0 || remainingSeconds <= 5 {
+                print("🧘 Break: \(remainingSeconds)s remaining")
+            }
+        case .snoozing(let untilDate, let snoozeCount):
+            print("😴 Snoozing until \(untilDate) (count: \(snoozeCount))")
         }
     }
 }

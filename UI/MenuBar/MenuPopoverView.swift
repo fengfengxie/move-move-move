@@ -2,11 +2,17 @@ import SwiftUI
 
 struct MenuPopoverView: View {
     var activityMonitor: ActivityMonitor?
+    var timerEngine: TimerEngine?
+    
     @State private var currentIdleTime: TimeInterval = 0
+    @State private var nextBreakSeconds: Int = 0
+    @State private var timerStatus: String = "Paused"
+    @State private var breaksToday: Int = 0
     @State private var timer: Timer?
     
-    init(activityMonitor: ActivityMonitor? = nil) {
+    init(activityMonitor: ActivityMonitor? = nil, timerEngine: TimerEngine? = nil) {
         self.activityMonitor = activityMonitor
+        self.timerEngine = timerEngine
     }
     
     var body: some View {
@@ -15,6 +21,36 @@ struct MenuPopoverView: View {
             Text("Move!Move!Move!")
                 .font(.system(size: 20, weight: .bold))
                 .frame(maxWidth: .infinity, alignment: .leading)
+            
+            Divider()
+            
+            // 状态信息
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Status:")
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text(timerStatus)
+                        .foregroundColor(timerStatus == "Running" ? .green : .orange)
+                }
+                
+                HStack {
+                    Text("Next break in:")
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text(formatTime(nextBreakSeconds))
+                        .font(.system(.body, design: .monospaced))
+                        .foregroundColor(nextBreakSeconds > 0 ? .primary : .secondary)
+                }
+                
+                HStack {
+                    Text("Breaks today:")
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(breaksToday)")
+                        .font(.system(.body, design: .monospaced))
+                }
+            }
             
             Divider()
             
@@ -46,37 +82,9 @@ struct MenuPopoverView: View {
                 Divider()
             }
             
-            // 状态信息
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Status:")
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text("Running")
-                        .foregroundColor(.green)
-                }
-                
-                HStack {
-                    Text("Next break in:")
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text("--:--")
-                        .font(.system(.body, design: .monospaced))
-                }
-                
-                HStack {
-                    Text("Breaks today:")
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text("0")
-                        .font(.system(.body, design: .monospaced))
-                }
-            }
-            
-            Divider()
-            
             // CTA 按钮
             Button(action: {
+                timerEngine?.beginBreak()
                 print("Start break now")
             }) {
                 Text("Start a break now")
@@ -115,24 +123,56 @@ struct MenuPopoverView: View {
         .padding()
         .frame(width: 300)
         .onAppear {
-            startIdleTimeUpdater()
+            startUpdaters()
         }
         .onDisappear {
-            stopIdleTimeUpdater()
+            stopUpdaters()
         }
     }
     
-    private func startIdleTimeUpdater() {
+    private func startUpdaters() {
+        // 启动定时器更新 UI
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
-            if let monitor = activityMonitor {
-                currentIdleTime = monitor.getSystemIdleSeconds()
-            }
+            updateTimerInfo()
+            updateIdleTime()
         }
     }
     
-    private func stopIdleTimeUpdater() {
+    private func stopUpdaters() {
         timer?.invalidate()
         timer = nil
+    }
+    
+    private func updateTimerInfo() {
+        guard let engine = timerEngine else { return }
+        
+        // 更新状态
+        timerStatus = engine.getStateDescription()
+        
+        // 更新剩余时间
+        if let seconds = engine.getNextBreakSeconds() {
+            nextBreakSeconds = seconds
+        } else {
+            nextBreakSeconds = 0
+        }
+        
+        // 更新今日休息次数
+        breaksToday = engine.breaksToday
+    }
+    
+    private func updateIdleTime() {
+        if let monitor = activityMonitor {
+            currentIdleTime = monitor.getSystemIdleSeconds()
+        }
+    }
+    
+    private func formatTime(_ totalSeconds: Int) -> String {
+        if totalSeconds <= 0 {
+            return "--:--"
+        }
+        let mins = totalSeconds / 60
+        let secs = totalSeconds % 60
+        return String(format: "%d:%02d", mins, secs)
     }
     
     private func formatIdleTime(_ seconds: TimeInterval) -> String {

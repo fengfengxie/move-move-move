@@ -5,6 +5,7 @@ class MenuBarController: NSObject {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     var activityMonitor: ActivityMonitor?
+    var timerEngine: TimerEngine?
     
     override init() {
         super.init()
@@ -29,13 +30,25 @@ class MenuBarController: NSObject {
         popover = NSPopover()
         popover?.contentSize = NSSize(width: 300, height: 250)
         popover?.behavior = .transient
+        updatePopoverContent()
+    }
+    
+    private func updatePopoverContent() {
         popover?.contentViewController = NSHostingController(
-            rootView: MenuPopoverView(activityMonitor: activityMonitor)
+            rootView: MenuPopoverView(
+                activityMonitor: activityMonitor,
+                timerEngine: timerEngine
+            )
         )
     }
     
     @objc private func togglePopover() {
         guard let popover = popover, let button = statusItem?.button else { return }
+        
+        // 每次打开时更新内容以确保传递最新的 timerEngine
+        if !popover.isShown {
+            updatePopoverContent()
+        }
         
         if popover.isShown {
             popover.performClose(nil)

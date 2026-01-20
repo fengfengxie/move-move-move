@@ -36,10 +36,21 @@ class TimerEngine: ObservableObject {
     // MARK: - Private Properties
     
     private var timer: Timer?
+    private var activityMonitor: ActivityMonitor?
+    private var cancellables = Set<AnyCancellable>()
+    
+    // 用于保存暂停时的进度
+    private var currentActiveSeconds: Int = 0
+    
+    // Snooze 结束但用户闲置的标记
+    private var snoozeEndedWhileIdle: Bool = false
+    private var snoozeCountAfterSnooze: Int = 0
     
     // MARK: - Lifecycle
     
-    init() {
+    init(activityMonitor: ActivityMonitor? = nil) {
+        self.activityMonitor = activityMonitor
+        setupActivityObserver()
         print("⏱️ TimerEngine initialized")
     }
     
@@ -53,13 +64,18 @@ class TimerEngine: ObservableObject {
     func start() {
         guard timer == nil else { return }
         
-        state = .running(activeSeconds: 0, targetSeconds: intervalSeconds)
+        // 根据当前活跃状态决定初始状态
+        if let monitor = activityMonitor, monitor.currentState == .idle {
+            state = .paused(reason: .idle)
+            print("▶️ TimerEngine started (but paused due to idle state)")
+        } else {
+            state = .running(activeSeconds: 0, targetSeconds: intervalSeconds)
+            print("▶️ TimerEngine started")
+        }
         
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.tick()
         }
-        
-        print("▶️ TimerEngine started")
     }
     
     /// 停止计时器
@@ -92,7 +108,92 @@ class TimerEngine: ObservableObject {
         print("🧘 Break started: \(breakDurationSeconds)s")
     }
     
+    // MARK: - State Helpers
+    
+    /// 获取下次休息的剩余秒数（用于 UI 显示）
+    func getNextBreakSeconds() -> Int? {
+        switch state {
+        case .running(let activeSeconds, let targetSeconds):
+            return targetSeconds - activeSeconds
+        case .paused:
+            return intervalSeconds - currentActiveSeconds
+        default:
+            return nil
+        }
+    }
+    
+    /// 获取当前状态的描述文本
+    func getStateDescription() -> String {
+        switch state {
+        case .running:
+            return "Running"
+        case .paused(let reason):
+            switch reason {
+            case .idle:
+                return "Paused (Idle)"
+            case .locked:
+                return "Paused (Locked)"
+            case .sleeping:
+                return "Paused (Sleeping)"
+            case .manual:
+                return "Paused"
+            }
+        case .alerting:
+            return "Alert!"
+        case .breakRunning:
+            return "Break Time"
+        case .snoozing:
+            return "Snoozed"
+        }
+    }
+    
+    /// 判断是否正在运行中（不含暂停）
+    var isRunning: Bool {
+        if case .running = state {
+            return true
+        }
+        return false
+    }
+    
     // MARK: - Private Methods
+    
+    /// 设置活跃状态监听
+    private func setupActivityObserver() {
+        activityMonitor?.$currentState
+            .sink { [weak self] state in
+                self?.handleActivityStateChange(state)
+            }
+            .store(in: &cancellables)
+    }
+    
+    /// 处理活跃状态变化
+    private func handleActivityStateChange(_ activityState: ActivityMonitor.ActivityState) {
+        switch state {
+        case .running(let activeSeconds, _):
+            if activityState == .idle {
+                // 用户变为闲置，暂停计时
+                state = .paused(reason: .idle)
+                // 保存当前进度
+                currentActiveSeconds = activeSeconds
+                print("⏸️ Timer paused (idle), progress saved: \(activeSeconds)s")
+            }
+            
+        case .paused(let reason):
+            if activityState == .active && reason == .idle {
+                // 用户重新活跃，恢复计时
+                state = .running(activeSeconds: currentActiveSeconds, targetSeconds: intervalSeconds)
+                print("▶️ Timer resumed (active), restored: \(currentActiveSeconds)s")
+            }
+            
+        case .snoozing(_, _):
+            // Snooze 期间不管活跃状态，等时间到
+            break
+            
+        case .alerting, .breakRunning:
+            // 这些状态不受活跃状态影响
+            break
+        }
+    }
     
     /// 计时器 tick（每秒调用）
     private func tick() {
@@ -106,6 +207,7 @@ class TimerEngine: ObservableObject {
                 print("⏰ Alert triggered!")
             } else {
                 state = .running(activeSeconds: newActiveSeconds, targetSeconds: targetSeconds)
+                currentActiveSeconds = newActiveSeconds
             }
             
         case .breakRunning(let remainingSeconds):
@@ -120,9 +222,26 @@ class TimerEngine: ObservableObject {
             
         case .snoozing(let untilDate, let snoozeCount):
             if Date() >= untilDate {
-                // Snooze 结束，重新触发提醒
-                state = .alerting(snoozeCount: snoozeCount)
-                print("⏰ Snooze ended, alerting again")
+                // Snooze 结束，检查活跃状态
+                if let monitor = activityMonitor, monitor.currentState == .active {
+                    // 用户仍活跃，立即触发提醒
+                    state = .alerting(snoozeCount: snoozeCount)
+                    print("⏰ Snooze ended, alerting again (user active)")
+                } else {
+                    // 用户闲置，等待恢复活跃
+                    snoozeEndedWhileIdle = true
+                    snoozeCountAfterSnooze = snoozeCount
+                    state = .paused(reason: .idle)
+                    print("😴 Snooze ended but user idle, waiting for activity")
+                }
+            }
+            
+        case .paused(_):
+            // 暂停期间需要检查是否 snooze 刚结束
+            if snoozeEndedWhileIdle, let monitor = activityMonitor, monitor.currentState == .active {
+                snoozeEndedWhileIdle = false
+                state = .alerting(snoozeCount: snoozeCountAfterSnooze)
+                print("⏰ User became active after snooze, alerting now")
             }
             
         default:
