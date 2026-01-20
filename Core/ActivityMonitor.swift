@@ -28,10 +28,11 @@ class ActivityMonitor: ObservableObject {
     
     // MARK: - Lifecycle
     
-    init() {
+    init(idleThresholdSeconds: TimeInterval = 180) {
+        self.idleThresholdSeconds = idleThresholdSeconds
         setupNotifications()
         startMonitoring()
-        print("👁️ ActivityMonitor initialized")
+        print("👁️ ActivityMonitor initialized (idle threshold: \(Int(idleThresholdSeconds))s)")
     }
     
     deinit {

@@ -4,6 +4,7 @@ import SwiftUI
 class MenuBarController: NSObject {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
+    var activityMonitor: ActivityMonitor?
     
     override init() {
         super.init()
@@ -26,9 +27,11 @@ class MenuBarController: NSObject {
     private func setupPopover() {
         // 创建 Popover
         popover = NSPopover()
-        popover?.contentSize = NSSize(width: 300, height: 200)
+        popover?.contentSize = NSSize(width: 300, height: 250)
         popover?.behavior = .transient
-        popover?.contentViewController = NSHostingController(rootView: MenuPopoverView())
+        popover?.contentViewController = NSHostingController(
+            rootView: MenuPopoverView(activityMonitor: activityMonitor)
+        )
     }
     
     @objc private func togglePopover() {

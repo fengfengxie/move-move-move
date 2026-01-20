@@ -1,6 +1,14 @@
 import SwiftUI
 
 struct MenuPopoverView: View {
+    var activityMonitor: ActivityMonitor?
+    @State private var currentIdleTime: TimeInterval = 0
+    @State private var timer: Timer?
+    
+    init(activityMonitor: ActivityMonitor? = nil) {
+        self.activityMonitor = activityMonitor
+    }
+    
     var body: some View {
         VStack(spacing: 16) {
             // App 标题
@@ -9,6 +17,34 @@ struct MenuPopoverView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             
             Divider()
+            
+            // Activity Monitor Status (Phase 2 Test)
+            if let monitor = activityMonitor {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Activity Monitor")
+                        .font(.headline)
+                    
+                    HStack {
+                        Circle()
+                            .fill(monitor.currentState == .active ? Color.green : Color.orange)
+                            .frame(width: 12, height: 12)
+                        Text(monitor.currentState == .active ? "Active" : "Idle")
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                    
+                    HStack {
+                        Text("Idle time:")
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text(formatIdleTime(currentIdleTime))
+                            .font(.system(.body, design: .monospaced))
+                    }
+                }
+                .padding(.vertical, 4)
+                
+                Divider()
+            }
             
             // 状态信息
             VStack(alignment: .leading, spacing: 8) {
@@ -78,6 +114,31 @@ struct MenuPopoverView: View {
         }
         .padding()
         .frame(width: 300)
+        .onAppear {
+            startIdleTimeUpdater()
+        }
+        .onDisappear {
+            stopIdleTimeUpdater()
+        }
+    }
+    
+    private func startIdleTimeUpdater() {
+        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+            if let monitor = activityMonitor {
+                currentIdleTime = monitor.getSystemIdleSeconds()
+            }
+        }
+    }
+    
+    private func stopIdleTimeUpdater() {
+        timer?.invalidate()
+        timer = nil
+    }
+    
+    private func formatIdleTime(_ seconds: TimeInterval) -> String {
+        let mins = Int(seconds) / 60
+        let secs = Int(seconds) % 60
+        return String(format: "%d:%02d", mins, secs)
     }
 }
 

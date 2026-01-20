@@ -20,7 +20,9 @@ let package = Package(
                 "README.md",
                 "Info.plist",
                 "build.sh",
-                ".gitignore"
+                ".gitignore",
+                "QUICKSTART.md",
+                "GIT_SETUP.md"
             ],
             sources: [
                 "App",
