@@ -34,53 +34,97 @@ MoveApp/
     └── Assets.xcassets
 ```
 
-## 🚀 Building
+## 🚀 Building & Installation
 
 ### Requirements
 - macOS 13.0+
-- Xcode 15.0+
+- Xcode 15.0+ (optional, for development)
 - Swift 5.9+
 
-### Build with Xcode
+### Quick Install (Pre-built)
+
+1. Download the latest release from GitHub
+2. Move the app to Applications:
+   ```bash
+   cp -R "Move!Move!Move!.app" /Applications/
+   ```
+3. Open from Applications or Spotlight
+4. Grant necessary permissions when prompted
+
+### Build from Source
+
+#### Option 1: Release Build (Recommended for daily use)
+
+```bash
+cd MoveApp
+./build.sh release
+```
+
+This creates a standalone `.app` bundle at `.build/release/Move!Move!Move!.app`
+
+To install:
+```bash
+cp -R ".build/release/Move!Move!Move!.app" /Applications/
+```
+
+#### Optional: Code Signing & Zip Packaging
+
+Release builds support optional code signing and zip packaging via environment variables:
+
+```bash
+# Sign with Developer ID
+CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./build.sh release
+
+# Ad-hoc signing (local testing)
+CODESIGN_ADHOC=1 ./build.sh release
+
+# Build and create a distributable zip
+PACKAGE_ZIP=1 ./build.sh release
+```
+
+#### Optional: Xcode Archive (for notarization)
 
 1. Open the project in Xcode:
    ```bash
    cd MoveApp
    open Package.swift
    ```
-
 2. Select the `MoveApp` scheme
+3. Product → Archive
+4. Distribute App → Developer ID / Notarized (as needed)
 
-3. Build and run: `Cmd + R`
+#### Option 2: Development Build
 
-### Build with Swift Package Manager
-
+With Xcode:
 ```bash
 cd MoveApp
-swift build
+open Package.swift
+# Then press Cmd + R
+```
+
+With Swift Package Manager:
+```bash
+cd MoveApp
+./build.sh        # or: swift build
 swift run MoveApp
 ```
 
 ## 📝 Development Status
 
-### Phase 1: ✅ Project Foundation (Completed)
-- [x] Project structure created
-- [x] Menu Bar app setup with NSStatusItem
-- [x] Basic popover implementation
-- [x] Core module skeletons (TimerEngine, ActivityMonitor, SettingsStore)
-- [x] Overlay window framework
-- [x] AlertCardView and BreakCardView UI components
+### ✅ Completed Phases
 
-### Next Phases
-- [ ] Phase 2: Activity Monitoring Integration
-- [ ] Phase 3: Timer Engine Logic
-- [ ] Phase 4: Overlay Window Triggers
-- [ ] Phase 5: Snooze Mechanism
-- [ ] Phase 6: Break Countdown
-- [ ] Phase 7: Menu Popover Enhancement
-- [ ] Phase 8: Settings & Persistence
-- [ ] Phase 9: Testing & Optimization
-- [ ] Phase 10: Packaging & Distribution
+- **Phase 1**: Project Foundation
+- **Phase 2**: Activity Monitoring (IOKit integration)
+- **Phase 3**: Timer Engine State Machine
+- **Phase 4**: Overlay Window System
+- **Phase 5**: Snooze Mechanism
+- **Phase 6**: Break Countdown
+- **Phase 7**: Enhanced Menu Popover
+- **Phase 8**: Settings & Persistence
+- **Phase 9**: Testing & Optimization
+- **Phase 10**: Build & Packaging ✨
+
+**Status**: Production Ready 🎉
 
 ## 🎨 Tech Stack
 
@@ -92,19 +136,60 @@ swift run MoveApp
 
 ## 📖 Usage
 
-1. The app runs in your menu bar (look for the walking figure icon 🚶)
-2. Click the icon to see status and settings
-3. Work for 60 minutes, and you'll get a break reminder
-4. Click "I'm Moving" to start your break countdown
-5. Or click "Snooze 5 min" to delay (max 2 times)
+### First Launch
+
+1. Launch the app - look for the walking figure icon (🚶) in your menu bar
+2. Click the icon to open the control panel
+3. Configure your preferences:
+   - **Work Interval**: Choose 45, 60, or 90 minutes
+   - **Break Duration**: Choose 60, 90, or 120 seconds
+4. The timer starts automatically
+
+### Daily Use
+
+1. **Normal Flow**:
+   - Work continuously for your set interval (default: 60 minutes)
+   - Full-screen reminder appears: "MOVE! MOVE! MOVE!"
+   - Click "I'm Moving" to start break countdown
+   - Follow the timer and take your break
+   - Timer resets automatically after break
+
+2. **Snooze Option**:
+   - Click "Snooze 5 min" to delay the break
+   - Maximum 2 snoozes per cycle
+   - After 2 snoozes, you must take the break
+
+3. **Manual Break**:
+   - Click menu bar icon
+   - Click "Start a break now" to trigger an immediate break
+
+4. **Auto-Pause**:
+   - Timer pauses when idle for 3+ minutes
+   - Timer pauses during screen lock or system sleep
+   - Automatically resumes when you return
+
+### Launch at Login
+
+Enable in the menu popover settings to start automatically at login.
 
 ## ⚙️ Configuration
 
-Default settings:
-- **Work Interval**: 60 minutes
-- **Break Duration**: 60 seconds
-- **Idle Threshold**: 3 minutes
-- **Snooze Duration**: 5 minutes (max 2 snoozes)
+Available settings (adjust in menu popover):
+
+| Setting | Options | Default |
+|---------|---------|---------|
+| Work Interval | 45/60/90 min | 60 min |
+| Break Duration | 60/90/120 sec | 60 sec |
+| Idle Threshold | Fixed | 180 sec |
+| Snooze Duration | Fixed | 300 sec |
+| Max Snoozes | Fixed | 2 |
+| Launch at Login | On/Off | Off |
+
+### Stats Tracked
+
+- Breaks completed today
+- Current cycle progress
+- Activity status (Active/Idle)
 
 ## 🔒 Privacy
 
@@ -112,6 +197,15 @@ Default settings:
 - No internet connection required
 - All processing happens locally
 - No tracking or analytics
+
+## 🖼️ Screenshots
+
+Add screenshots to the [MoveApp/Resources/Screenshots](MoveApp/Resources/Screenshots) folder:
+
+- menu-popover.png
+- overlay-alert.png
+- break-countdown.png
+- completion-state.png
 
 ## 📄 License
 

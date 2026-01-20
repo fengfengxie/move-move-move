@@ -36,7 +36,7 @@ class TimerEngine: ObservableObject {
     private var snoozeDurationSeconds: Int = 5 * 60  // 默认 5 分钟
     
     // 开发模式：使用短间隔快速测试
-    static let developmentMode = true  // 设为 true 启用快速测试（15秒触发提醒）
+    static let developmentMode = false  // 设为 true 启用快速测试（15秒触发提醒）
     
     // MARK: - Private Properties
     
