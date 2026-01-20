@@ -18,11 +18,12 @@ let package = Package(
             path: ".",
             exclude: [
                 "README.md",
+                "TESTING.md",
                 "Info.plist",
                 "build.sh",
+                "generate_app_icon.sh",
                 ".gitignore",
-                "QUICKSTART.md",
-                "GIT_SETUP.md"
+                "Tests"
             ],
             sources: [
                 "App",
