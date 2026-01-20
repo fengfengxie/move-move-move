@@ -96,6 +96,24 @@ struct MenuPopoverView: View {
             
             // 菜单项
             VStack(spacing: 8) {
+                // TEST: Manual alert trigger (for development)
+                if TimerEngine.developmentMode {
+                    Button(action: {
+                        print("🧪 Manual test: Triggering alert")
+                        timerEngine?.debugTriggerAlert()
+                    }) {
+                        HStack {
+                            Text("🧪 Test Alert")
+                            Spacer()
+                            Image(systemName: "ladybug")
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(.orange)
+                    
+                    Divider()
+                }
+                
                 Button(action: {
                     print("Settings...")
                 }) {

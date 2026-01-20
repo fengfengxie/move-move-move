@@ -6,6 +6,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBarController: MenuBarController?
     private var activityMonitor: ActivityMonitor?
     private var timerEngine: TimerEngine?
+    private var overlayWindowController: OverlayWindowController?
     private var cancellables = Set<AnyCancellable>()
     
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -14,6 +15,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // 初始化 Timer Engine (与 Activity Monitor 关联)
         timerEngine = TimerEngine(activityMonitor: activityMonitor)
+        
+        // 初始化 Overlay Window Controller
+        overlayWindowController = OverlayWindowController()
+        setupOverlayCallbacks()
         
         // 监听活跃状态变化
         activityMonitor?.$currentState
@@ -80,16 +85,76 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if activeSeconds % 60 == 0 {  // 每分钟打印一次，避免日志过多
                 print("⏱️ Timer running: \(activeSeconds)s / \(targetSeconds)s (remaining: \(remaining)s)")
             }
+            // 隐藏 overlay（如果有的话）
+            if overlayWindowController?.window?.isVisible == true {
+                overlayWindowController?.hide()
+            }
         case .paused(let reason):
             print("⏸️ Timer paused: \(reason)")
         case .alerting(let snoozeCount):
             print("🚨 ALERT! (snooze count: \(snoozeCount))")
+            // 显示提醒 overlay
+            showAlertOverlay(snoozeCount: snoozeCount)
         case .breakRunning(let remainingSeconds):
             if remainingSeconds % 10 == 0 || remainingSeconds <= 5 {
                 print("🧘 Break: \(remainingSeconds)s remaining")
             }
+            // 更新休息倒计时 overlay
+            updateBreakOverlay(remainingSeconds: remainingSeconds)
+        case .breakCompleted:
+            print("🎉 Break completed!")
+            // 显示完成卡片
+            showCompletionOverlay()
         case .snoozing(let untilDate, let snoozeCount):
             print("😴 Snoozing until \(untilDate) (count: \(snoozeCount))")
+            // 隐藏 overlay
+            overlayWindowController?.hide()
         }
+    }
+    
+    // MARK: - Overlay Management
+    
+    private func setupOverlayCallbacks() {
+        overlayWindowController?.onMoveClicked = { [weak self] in
+            print("✅ User clicked 'I'm Moving'")
+            self?.timerEngine?.beginBreak()
+        }
+        
+        overlayWindowController?.onSnoozeClicked = { [weak self] in
+            print("😴 User clicked 'Snooze'")
+            self?.timerEngine?.snooze()
+        }
+    }
+    
+    private func showAlertOverlay(snoozeCount: Int) {
+        overlayWindowController?.show(
+            on: NSScreen.main,
+            contentType: .alert(snoozeCount: snoozeCount)
+        )
+    }
+    
+    private func updateBreakOverlay(remainingSeconds: Int) {
+        // 如果 overlay 已经显示，只需要更新内容
+        // 否则显示新的 overlay
+        if overlayWindowController?.window?.isVisible == true {
+            // 更新内容
+            overlayWindowController?.show(
+                on: NSScreen.main,
+                contentType: .breakTime(remainingSeconds: remainingSeconds)
+            )
+        } else {
+            // 首次显示
+            overlayWindowController?.show(
+                on: NSScreen.main,
+                contentType: .breakTime(remainingSeconds: remainingSeconds)
+            )
+        }
+    }
+    
+    private func showCompletionOverlay() {
+        overlayWindowController?.show(
+            on: NSScreen.main,
+            contentType: .breakCompleted
+        )
     }
 }

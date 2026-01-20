@@ -12,6 +12,7 @@ class TimerEngine: ObservableObject {
         case paused(reason: PauseReason)
         case alerting(snoozeCount: Int)
         case breakRunning(remainingSeconds: Int)
+        case breakCompleted  // 休息完成，显示成功消息
         case snoozing(untilDate: Date, snoozeCount: Int)
     }
     
@@ -33,6 +34,9 @@ class TimerEngine: ObservableObject {
     private var intervalSeconds: Int = 60 * 60  // 默认 60 分钟
     private var breakDurationSeconds: Int = 60  // 默认 60 秒
     
+    // 开发模式：使用短间隔快速测试
+    static let developmentMode = false  // 设为 true 启用快速测试（10秒触发提醒）
+    
     // MARK: - Private Properties
     
     private var timer: Timer?
@@ -50,6 +54,14 @@ class TimerEngine: ObservableObject {
     
     init(activityMonitor: ActivityMonitor? = nil) {
         self.activityMonitor = activityMonitor
+        
+        // 开发模式：使用短间隔
+        if Self.developmentMode {
+            intervalSeconds = 10  // 10 秒后触发提醒
+            breakDurationSeconds = 5  // 5 秒休息
+            print("🛠️ DEVELOPMENT MODE: Using short intervals (10s alert, 5s break)")
+        }
+        
         setupActivityObserver()
         print("⏱️ TimerEngine initialized")
     }
@@ -142,6 +154,8 @@ class TimerEngine: ObservableObject {
             return "Alert!"
         case .breakRunning:
             return "Break Time"
+        case .breakCompleted:
+            return "Break Complete!"
         case .snoozing:
             return "Snoozed"
         }
@@ -153,6 +167,16 @@ class TimerEngine: ObservableObject {
             return true
         }
         return false
+    }
+    
+    // MARK: - Debug Helpers
+    
+    /// 开发模式：手动触发提醒（用于测试）
+    func debugTriggerAlert() {
+        if Self.developmentMode {
+            state = .alerting(snoozeCount: 0)
+            print("🧪 DEBUG: Manually triggered alert")
+        }
     }
     
     // MARK: - Private Methods
@@ -189,7 +213,7 @@ class TimerEngine: ObservableObject {
             // Snooze 期间不管活跃状态，等时间到
             break
             
-        case .alerting, .breakRunning:
+        case .alerting, .breakRunning, .breakCompleted:
             // 这些状态不受活跃状态影响
             break
         }
@@ -252,9 +276,10 @@ class TimerEngine: ObservableObject {
     /// 完成一次休息
     private func completeBreak() {
         breaksToday += 1
+        state = .breakCompleted
         print("✅ Break completed! Total today: \(breaksToday)")
         
-        // 稍后重置周期
+        // 1秒后重置周期
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             self?.resetCycle()
         }
