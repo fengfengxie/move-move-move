@@ -33,9 +33,10 @@ class TimerEngine: ObservableObject {
     
     private var intervalSeconds: Int = 60 * 60  // 默认 60 分钟
     private var breakDurationSeconds: Int = 60  // 默认 60 秒
+    private var snoozeDurationSeconds: Int = 5 * 60  // 默认 5 分钟
     
     // 开发模式：使用短间隔快速测试
-    static let developmentMode = false  // 设为 true 启用快速测试（10秒触发提醒）
+    static let developmentMode = true  // 设为 true 启用快速测试（15秒触发提醒）
     
     // MARK: - Private Properties
     
@@ -57,9 +58,10 @@ class TimerEngine: ObservableObject {
         
         // 开发模式：使用短间隔
         if Self.developmentMode {
-            intervalSeconds = 10  // 10 秒后触发提醒
-            breakDurationSeconds = 5  // 5 秒休息
-            print("🛠️ DEVELOPMENT MODE: Using short intervals (10s alert, 5s break)")
+            intervalSeconds = 15  // 15 秒后触发提醒
+            breakDurationSeconds = 8  // 8 秒休息
+            snoozeDurationSeconds = 10  // 10 秒 snooze
+            print("🛠️ DEVELOPMENT MODE: Using short intervals (15s alert, 8s break, 10s snooze)")
         }
         
         setupActivityObserver()
@@ -108,10 +110,13 @@ class TimerEngine: ObservableObject {
     func snooze() {
         guard case .alerting(let snoozeCount) = state else { return }
         
-        let untilDate = Date().addingTimeInterval(5 * 60)  // 5 分钟后
+        let untilDate = Date().addingTimeInterval(TimeInterval(snoozeDurationSeconds))
         state = .snoozing(untilDate: untilDate, snoozeCount: snoozeCount + 1)
         
-        print("😴 Snoozing until \(untilDate), count: \(snoozeCount + 1)")
+        let minutes = snoozeDurationSeconds / 60
+        let seconds = snoozeDurationSeconds % 60
+        let durationStr = minutes > 0 ? "\(minutes)m" : "\(seconds)s"
+        print("😴 Snoozing for \(durationStr) until \(untilDate), count: \(snoozeCount + 1)")
     }
     
     /// 开始休息倒计时
