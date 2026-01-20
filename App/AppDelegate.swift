@@ -7,9 +7,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var activityMonitor: ActivityMonitor?
     private var timerEngine: TimerEngine?
     private var overlayWindowController: OverlayWindowController?
+    private var settingsStore: SettingsStore?
     private var cancellables = Set<AnyCancellable>()
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 初始化 Settings Store
+        settingsStore = SettingsStore()
+        
         // 初始化 Activity Monitor
         activityMonitor = ActivityMonitor()
         
@@ -38,6 +42,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menuBarController = MenuBarController()
         menuBarController?.activityMonitor = activityMonitor
         menuBarController?.timerEngine = timerEngine
+        menuBarController?.settingsStore = settingsStore
         
         // 隐藏主窗口（如果有）
         NSApplication.shared.setActivationPolicy(.accessory)

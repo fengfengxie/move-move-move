@@ -6,6 +6,7 @@ class MenuBarController: NSObject {
     private var popover: NSPopover?
     var activityMonitor: ActivityMonitor?
     var timerEngine: TimerEngine?
+    var settingsStore: SettingsStore?
     
     override init() {
         super.init()
@@ -28,16 +29,18 @@ class MenuBarController: NSObject {
     private func setupPopover() {
         // 创建 Popover
         popover = NSPopover()
-        popover?.contentSize = NSSize(width: 300, height: 250)
+        popover?.contentSize = NSSize(width: 320, height: 250)
         popover?.behavior = .transient
         updatePopoverContent()
     }
     
     private func updatePopoverContent() {
+        guard let settings = settingsStore else { return }
         popover?.contentViewController = NSHostingController(
             rootView: MenuPopoverView(
                 activityMonitor: activityMonitor,
-                timerEngine: timerEngine
+                timerEngine: timerEngine,
+                settingsStore: settings
             )
         )
     }
