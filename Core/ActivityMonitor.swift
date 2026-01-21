@@ -12,11 +12,22 @@ class ActivityMonitor: ObservableObject {
         case active     // 用户正在活跃使用
         case idle       // 用户闲置
     }
+
+    enum LockSleepState {
+        case none
+        case locked
+        case sleeping
+    }
     
     // MARK: - Published Properties
     
     @Published private(set) var currentState: ActivityState = .active
     @Published private(set) var wasLockedOrSleeping: Bool = false
+    @Published private(set) var lockSleepState: LockSleepState = .none
+
+    var isLockedOrSleeping: Bool {
+        return lockSleepState != .none
+    }
     
     // MARK: - Settings
     
@@ -102,6 +113,7 @@ class ActivityMonitor: ObservableObject {
         workspace.publisher(for: NSWorkspace.didWakeNotification)
             .sink { [weak self] _ in
                 print("🌅 System WOKE UP")
+                self?.lockSleepState = .none
                 self?.currentState = .active
             }
             .store(in: &cancellables)
@@ -111,6 +123,7 @@ class ActivityMonitor: ObservableObject {
             .sink { [weak self] _ in
                 print("😴 System SLEEPING - setting wasLockedOrSleeping=true")
                 self?.wasLockedOrSleeping = true  // Set flag when going to sleep
+                self?.lockSleepState = .sleeping
                 self?.currentState = .idle
             }
             .store(in: &cancellables)
@@ -121,6 +134,7 @@ class ActivityMonitor: ObservableObject {
                               queue: .main) { [weak self] _ in
             print("🔒 Screen LOCKED - setting wasLockedOrSleeping=true")
             self?.wasLockedOrSleeping = true  // Set flag when locking
+            self?.lockSleepState = .locked
             self?.currentState = .idle
         }
         
@@ -129,6 +143,7 @@ class ActivityMonitor: ObservableObject {
                               object: nil, 
                               queue: .main) { [weak self] _ in
             print("🔓 Screen UNLOCKED")
+            self?.lockSleepState = .none
             self?.currentState = .active
         }
         
@@ -137,6 +152,7 @@ class ActivityMonitor: ObservableObject {
                               object: nil, 
                               queue: .main) { [weak self] _ in
             self?.wasLockedOrSleeping = true  // Set flag when screensaver starts
+            self?.lockSleepState = .locked
             self?.currentState = .idle
         }
         
@@ -144,6 +160,7 @@ class ActivityMonitor: ObservableObject {
         distCenter.addObserver(forName: NSNotification.Name("com.apple.screensaver.didstop"), 
                               object: nil, 
                               queue: .main) { [weak self] _ in
+            self?.lockSleepState = .none
             self?.currentState = .active
         }
         
@@ -151,12 +168,14 @@ class ActivityMonitor: ObservableObject {
         workspace.publisher(for: NSWorkspace.sessionDidResignActiveNotification)
             .sink { [weak self] _ in
                 self?.wasLockedOrSleeping = true  // Set flag when session resigns
+                self?.lockSleepState = .locked
                 self?.currentState = .idle
             }
             .store(in: &cancellables)
         
         workspace.publisher(for: NSWorkspace.sessionDidBecomeActiveNotification)
             .sink { [weak self] _ in
+                self?.lockSleepState = .none
                 self?.currentState = .active
             }
             .store(in: &cancellables)

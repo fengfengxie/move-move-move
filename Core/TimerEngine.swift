@@ -47,6 +47,10 @@ class TimerEngine: ObservableObject {
     
     // 用于保存暂停时的进度
     private var currentActiveSeconds: Int = 0
+    private var pausedBreakRemainingSeconds: Int?
+    private var pausedSnoozeRemainingSeconds: Int?
+    private var pausedSnoozeCount: Int = 0
+    private var pausedForLockOrSleep: Bool = false
     
     // Snooze 结束但用户闲置的标记
     private var snoozeEndedWhileIdle: Bool = false
@@ -245,16 +249,26 @@ class TimerEngine: ObservableObject {
     
     /// 处理活跃状态变化
     private func handleActivityStateChange(_ activityState: ActivityMonitor.ActivityState) {
+        let lockReason: PauseReason? = {
+            guard let monitor = activityMonitor else { return nil }
+            switch monitor.lockSleepState {
+            case .sleeping:
+                return .sleeping
+            case .locked:
+                return .locked
+            case .none:
+                return nil
+            }
+        }()
+
         switch state {
         case .running(let activeSeconds, _):
             if activityState == .idle {
                 // Check if this is a lock/sleep event
-                if let monitor = activityMonitor, monitor.wasLockedOrSleeping {
+                if let reason = lockReason {
                     // Lock/sleep detected: reset to 0 and pause
                     print("🔒 Lock/sleep detected - resetting timer to 0 and pausing")
-                    currentActiveSeconds = 0
-                    state = .paused(reason: .locked)
-                    monitor.resetLockOrSleepFlag()
+                    pauseForLockOrSleep(reason: reason)
                 } else {
                     // Normal idle: pause and save progress
                     state = .paused(reason: .idle)
@@ -265,9 +279,14 @@ class TimerEngine: ObservableObject {
             
         case .paused(let reason):
             if activityState == .active {
-                // Resume from pause - just continue from current progress
-                print("▶️ Resuming timer from \(reason) (continuing from \(currentActiveSeconds)s)")
-                state = .running(activeSeconds: currentActiveSeconds, targetSeconds: intervalSeconds)
+                // Resume from lock/sleep only after unlock/wake
+                if !isLockedOrSleeping(), pauseReasonIsLockOrSleep(reason) {
+                    resumeAfterLockOrSleepIfNeeded()
+                } else if reason == .idle {
+                    // Resume from idle - just continue from current progress
+                    print("▶️ Resuming timer from \(reason) (continuing from \(currentActiveSeconds)s)")
+                    state = .running(activeSeconds: currentActiveSeconds, targetSeconds: intervalSeconds)
+                }
             }
             
         case .snoozing(_, _):
@@ -282,6 +301,15 @@ class TimerEngine: ObservableObject {
     
     /// Timer tick (called every second)
     private func tick() {
+        // If system is locked or sleeping, pause any countdown and return
+        if isLockedOrSleeping() {
+            if !pausedForLockOrSleep {
+                let reason: PauseReason = activityMonitor?.lockSleepState == .sleeping ? .sleeping : .locked
+                pauseForLockOrSleep(reason: reason)
+            }
+            return
+        }
+
         // Reset paused tick counter when not paused
         if case .paused = state {
             pausedTickCount += 1
@@ -339,6 +367,69 @@ class TimerEngine: ObservableObject {
         default:
             break
         }
+    }
+
+    private func pauseForLockOrSleep(reason: PauseReason) {
+        pausedForLockOrSleep = true
+
+        switch state {
+        case .running:
+            currentActiveSeconds = 0
+            state = .paused(reason: reason)
+            print("🔒 Paused running timer for lock/sleep (reset to 0)")
+
+        case .breakRunning(let remainingSeconds):
+            pausedBreakRemainingSeconds = remainingSeconds
+            state = .paused(reason: reason)
+            print("🔒 Paused break timer for lock/sleep")
+
+        case .snoozing(let untilDate, let snoozeCount):
+            let remaining = max(0, Int(untilDate.timeIntervalSinceNow))
+            pausedSnoozeRemainingSeconds = remaining
+            pausedSnoozeCount = snoozeCount
+            snoozeEndedWhileIdle = false
+            state = .paused(reason: reason)
+            print("🔒 Paused snooze timer for lock/sleep")
+
+        case .paused:
+            state = .paused(reason: reason)
+
+        default:
+            break
+        }
+
+        activityMonitor?.resetLockOrSleepFlag()
+    }
+
+    private func resumeAfterLockOrSleepIfNeeded() {
+        guard pausedForLockOrSleep else { return }
+        pausedForLockOrSleep = false
+
+        if let remainingBreak = pausedBreakRemainingSeconds {
+            pausedBreakRemainingSeconds = nil
+            state = .breakRunning(remainingSeconds: remainingBreak)
+            print("▶️ Resuming break after lock/sleep")
+            return
+        }
+
+        if let remainingSnooze = pausedSnoozeRemainingSeconds {
+            pausedSnoozeRemainingSeconds = nil
+            let untilDate = Date().addingTimeInterval(TimeInterval(remainingSnooze))
+            state = .snoozing(untilDate: untilDate, snoozeCount: pausedSnoozeCount)
+            print("▶️ Resuming snooze after lock/sleep")
+            return
+        }
+
+        print("▶️ Resuming timer after lock/sleep (starting from 0)")
+        state = .running(activeSeconds: currentActiveSeconds, targetSeconds: intervalSeconds)
+    }
+
+    private func isLockedOrSleeping() -> Bool {
+        return activityMonitor?.isLockedOrSleeping ?? false
+    }
+
+    private func pauseReasonIsLockOrSleep(_ reason: PauseReason) -> Bool {
+        return reason == .locked || reason == .sleeping
     }
     
     /// 完成一次休息
