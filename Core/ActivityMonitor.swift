@@ -42,6 +42,11 @@ class ActivityMonitor: ObservableObject {
     
     // MARK: - Public Methods
     
+    /// 重置锁定/睡眠标志
+    func resetLockOrSleepFlag() {
+        wasLockedOrSleeping = false
+    }
+    
     /// 获取系统闲置时间（秒）
     func getSystemIdleSeconds() -> TimeInterval {
         var iterator: io_iterator_t = 0

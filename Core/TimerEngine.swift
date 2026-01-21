@@ -259,6 +259,7 @@ class TimerEngine: ObservableObject {
                 if let monitor = activityMonitor, monitor.wasLockedOrSleeping {
                     // 从锁定或睡眠恢复，重置计时器（假设用户已经离开活动了）
                     resetCycle()
+                    monitor.resetLockOrSleepFlag()  // 重置标志，下次可以再次使用
                     print("🔄 Timer reset on resume from lock/sleep - assuming user was active")
                 } else if reason == .idle {
                     // 从闲置恢复，继续之前的计时
@@ -341,30 +342,35 @@ class TimerEngine: ObservableObject {
         
         print("✅ Break completed! Total today: \(breaksToday)")
         
-        // 锁定计算机以保护隐私
-        lockScreen()
+        // 2秒后锁定屏幕（给用户时间看到完成消息）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.lockScreen()
+        }
         
-        // 1秒后重置周期
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+        // 3秒后重置周期（在锁屏之后）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
             self?.resetCycle()
         }
     }
     
     /// 锁定屏幕
     private func lockScreen() {
-        let script = """
-        tell application "System Events"
-            keystroke "q" using {control down, command down}
-        end tell
-        """
-        
-        var error: NSDictionary?
-        if let scriptObject = NSAppleScript(source: script) {
-            scriptObject.executeAndReturnError(&error)
-            if let error = error {
-                print("⚠️ Failed to lock screen: \(error)")
-            } else {
-                print("🔒 Screen locked for privacy")
+        // 在后台线程执行 AppleScript 避免阻塞主线程
+        DispatchQueue.global(qos: .userInitiated).async {
+            let script = """
+            tell application "System Events"
+                keystroke "q" using {control down, command down}
+            end tell
+            """
+            
+            var error: NSDictionary?
+            if let scriptObject = NSAppleScript(source: script) {
+                scriptObject.executeAndReturnError(&error)
+                if let error = error {
+                    print("⚠️ Failed to lock screen: \(error)")
+                } else {
+                    print("🔒 Screen locked for privacy")
+                }
             }
         }
     }

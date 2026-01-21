@@ -75,6 +75,8 @@ if [ "$MODE" = "release" ] || [ "$MODE" = "package" ]; then
     <string>Copyright © 2026 fengfengxie. All rights reserved.</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>MoveApp needs permission to lock your screen after breaks for privacy.</string>
 </dict>
 </plist>
 EOF

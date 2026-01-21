@@ -26,5 +26,7 @@
     <string>Copyright © 2026. All rights reserved.</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>MoveApp needs permission to lock your screen after breaks for privacy.</string>
 </dict>
 </plist>
