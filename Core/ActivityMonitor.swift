@@ -33,7 +33,6 @@ class ActivityMonitor: ObservableObject {
         self.idleThresholdSeconds = idleThresholdSeconds
         setupNotifications()
         startMonitoring()
-        print("👁️ ActivityMonitor initialized (idle threshold: \(Int(idleThresholdSeconds))s)")
     }
     
     deinit {
@@ -92,7 +91,6 @@ class ActivityMonitor: ObservableObject {
         
         if newState != currentState {
             currentState = newState
-            print("🔄 Activity state changed: \(newState) (idle time: \(Int(idleTime))s, threshold: \(Int(idleThresholdSeconds))s)")
         }
     }
     
@@ -100,73 +98,63 @@ class ActivityMonitor: ObservableObject {
         let workspace = NSWorkspace.shared.notificationCenter
         let distCenter = DistributedNotificationCenter.default()
         
-        // 监听唤醒
+        // Monitor wake
         workspace.publisher(for: NSWorkspace.didWakeNotification)
             .sink { [weak self] _ in
-                print("🌅 System woke up")
-                self?.wasLockedOrSleeping = true
+                print("🌅 System WOKE UP - setting wasLockedOrSleeping=true")
+                self?.wasLockedOrSleeping = true  // Set flag when waking up (end of sleep)
                 self?.currentState = .active
             }
             .store(in: &cancellables)
         
-        // 监听睡眠
+        // Monitor sleep
         workspace.publisher(for: NSWorkspace.willSleepNotification)
             .sink { [weak self] _ in
-                print("😴 System will sleep")
-                self?.wasLockedOrSleeping = true
-                self?.currentState = .idle
+                self?.currentState = .idle  // Just pause, don't set flag
             }
             .store(in: &cancellables)
         
-        // 监听锁屏 (使用 DistributedNotificationCenter)
+        // Monitor screen lock (using DistributedNotificationCenter)
         distCenter.addObserver(forName: NSNotification.Name("com.apple.screenIsLocked"), 
                               object: nil, 
                               queue: .main) { [weak self] _ in
-            print("🔒 Screen locked (DistributedNotification)")
-            self?.wasLockedOrSleeping = true
-            self?.currentState = .idle
+            self?.currentState = .idle  // Just pause, don't set flag
         }
         
-        // 监听解锁
+        // Monitor screen unlock
         distCenter.addObserver(forName: NSNotification.Name("com.apple.screenIsUnlocked"), 
                               object: nil, 
                               queue: .main) { [weak self] _ in
-            print("🔓 Screen unlocked (DistributedNotification)")
-            self?.wasLockedOrSleeping = true
+            print("🔓 Screen UNLOCKED - setting wasLockedOrSleeping=true")
+            self?.wasLockedOrSleeping = true  // Set flag when unlocking (end of lock)
             self?.currentState = .active
         }
         
-        // 监听屏幕保护启动
+        // Monitor screen saver start
         distCenter.addObserver(forName: NSNotification.Name("com.apple.screensaver.didstart"), 
                               object: nil, 
                               queue: .main) { [weak self] _ in
-            print("🖼️ Screen saver started")
-            self?.wasLockedOrSleeping = true
-            self?.currentState = .idle
+            self?.currentState = .idle  // Just pause, don't set flag
         }
         
-        // 监听屏幕保护停止
+        // Monitor screen saver stop
         distCenter.addObserver(forName: NSNotification.Name("com.apple.screensaver.didstop"), 
                               object: nil, 
                               queue: .main) { [weak self] _ in
-            print("🖼️ Screen saver stopped")
-            self?.wasLockedOrSleeping = true
+            self?.wasLockedOrSleeping = true  // Set flag when screensaver stops (end of lock)
             self?.currentState = .active
         }
         
-        // 监听会话变化（备用检测）
+        // Monitor session changes (backup detection)
         workspace.publisher(for: NSWorkspace.sessionDidResignActiveNotification)
             .sink { [weak self] _ in
-                print("🔒 Session resigned active")
-                self?.wasLockedOrSleeping = true
-                self?.currentState = .idle
+                self?.currentState = .idle  // Just pause, don't set flag
             }
             .store(in: &cancellables)
         
         workspace.publisher(for: NSWorkspace.sessionDidBecomeActiveNotification)
             .sink { [weak self] _ in
-                print("🔓 Session became active")
-                self?.wasLockedOrSleeping = true
+                self?.wasLockedOrSleeping = true  // Set flag when session becomes active (end of lock)
                 self?.currentState = .active
             }
             .store(in: &cancellables)

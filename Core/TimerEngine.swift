@@ -35,8 +35,8 @@ class TimerEngine: ObservableObject {
     private var breakDurationSeconds: Int = 60  // 默认 60 秒
     private var snoozeDurationSeconds: Int = 5 * 60  // 默认 5 分钟
     
-    // 开发模式：使用短间隔快速测试
-    static let developmentMode = false  // 设为 true 启用快速测试（15秒触发提醒）
+    // Development mode: use short intervals for testing
+    static let developmentMode = false
     
     // MARK: - Private Properties
     
@@ -59,17 +59,14 @@ class TimerEngine: ObservableObject {
         self.activityMonitor = activityMonitor
         self.settingsStore = settingsStore
         
-        // 开发模式：使用短间隔
         if Self.developmentMode {
-            intervalSeconds = 15  // 15 秒后触发提醒
-            breakDurationSeconds = 8  // 8 秒休息
-            snoozeDurationSeconds = 10  // 10 秒 snooze
-            print("🛠️ DEVELOPMENT MODE: Using short intervals (15s alert, 8s break, 10s snooze)")
+            intervalSeconds = 15
+            breakDurationSeconds = 8
+            snoozeDurationSeconds = 10
+            print("🛠️ DEVELOPMENT MODE: 15s alert, 8s break, 10s snooze")
         } else if let settings = settingsStore {
-            // 生产模式：使用设置的间隔
             intervalSeconds = settings.intervalMinutes * 60
             breakDurationSeconds = settings.breakSeconds
-            print("⚙️ Using settings: \(settings.intervalMinutes)min interval, \(settings.breakSeconds)s break")
         }
         
         // 同步 breaksToday 从 SettingsStore
@@ -92,8 +89,12 @@ class TimerEngine: ObservableObject {
     func start() {
         guard timer == nil else { return }
         
-        // 根据当前活跃状态决定初始状态
-        if let monitor = activityMonitor, monitor.currentState == .idle {
+        // Check if waking from lock/sleep - if so, always start fresh
+        if let monitor = activityMonitor, monitor.wasLockedOrSleeping {
+            print("▶️ TimerEngine started after lock/sleep - resetting")
+            state = .running(activeSeconds: 0, targetSeconds: intervalSeconds)
+            monitor.resetLockOrSleepFlag()
+        } else if let monitor = activityMonitor, monitor.currentState == .idle {
             state = .paused(reason: .idle)
             print("▶️ TimerEngine started (but paused due to idle state)")
         } else {
@@ -251,26 +252,25 @@ class TimerEngine: ObservableObject {
         switch state {
         case .running(let activeSeconds, _):
             if activityState == .idle {
-                // 用户变为闲置，暂停计时
+                // User became idle, pause and save progress
                 state = .paused(reason: .idle)
-                // 保存当前进度
                 currentActiveSeconds = activeSeconds
-                print("⏸️ Timer paused (idle), progress saved: \(activeSeconds)s, wasLockedOrSleeping: \(activityMonitor?.wasLockedOrSleeping ?? false)")
+                print("⏸️ Timer paused (idle)")
             }
             
         case .paused(let reason):
             if activityState == .active {
-                print("🔍 Checking resume: reason=\(reason), wasLockedOrSleeping=\(activityMonitor?.wasLockedOrSleeping ?? false)")
-                // Check if this is a resume from lock/sleep
+                print("🔍 Resuming from paused: reason=\(reason), wasLockedOrSleeping=\(activityMonitor?.wasLockedOrSleeping ?? false)")
+                // Check if resuming from lock/sleep or idle
                 if let monitor = activityMonitor, monitor.wasLockedOrSleeping {
-                    // 从锁定或睡眠恢复，重置计时器（假设用户已经离开活动了）
+                    // Reset timer on resume from lock/sleep
+                    print("🔄 RESETTING timer after lock/sleep")
                     resetCycle()
-                    monitor.resetLockOrSleepFlag()  // 重置标志，下次可以再次使用
-                    print("🔄 Timer reset on resume from lock/sleep - assuming user was active")
-                } else if reason == .idle {
-                    // 从闲置恢复，继续之前的计时
+                    monitor.resetLockOrSleepFlag()
+                } else {
+                    // Resume from normal idle, continue previous progress
+                    print("▶️ Resuming timer from idle (continuing from \(currentActiveSeconds)s)")
                     state = .running(activeSeconds: currentActiveSeconds, targetSeconds: intervalSeconds)
-                    print("▶️ Timer resumed (active), restored: \(currentActiveSeconds)s")
                 }
             }
             
@@ -284,19 +284,13 @@ class TimerEngine: ObservableObject {
         }
     }
     
-    /// 计时器 tick（每秒调用）
+    /// Timer tick (called every second)
     private func tick() {
-        // Log every 30 seconds in running state, or always for paused
-        if case .running(let activeSeconds, _) = state, activeSeconds % 30 == 0 {
-            print("⏱️ Tick: state=running(\(activeSeconds)s)")
-        } else if case .paused(let reason) = state {
-            // Only log first few ticks when paused to avoid spam
-            if pausedTickCount < 3 {
-                print("⏸️ Tick: state=paused(\(reason))")
-                pausedTickCount += 1
-            }
+        // Reset paused tick counter when not paused
+        if case .paused = state {
+            pausedTickCount += 1
         } else {
-            pausedTickCount = 0  // Reset counter when not paused
+            pausedTickCount = 0
         }
         
         switch state {
