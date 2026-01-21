@@ -92,12 +92,13 @@ class ActivityMonitor: ObservableObject {
         
         if newState != currentState {
             currentState = newState
-            print("🔄 Activity state changed: \(newState)")
+            print("🔄 Activity state changed: \(newState) (idle time: \(Int(idleTime))s, threshold: \(Int(idleThresholdSeconds))s)")
         }
     }
     
     private func setupNotifications() {
         let workspace = NSWorkspace.shared.notificationCenter
+        let distCenter = DistributedNotificationCenter.default()
         
         // 监听唤醒
         workspace.publisher(for: NSWorkspace.didWakeNotification)
@@ -112,14 +113,52 @@ class ActivityMonitor: ObservableObject {
         workspace.publisher(for: NSWorkspace.willSleepNotification)
             .sink { [weak self] _ in
                 print("😴 System will sleep")
+                self?.wasLockedOrSleeping = true
                 self?.currentState = .idle
             }
             .store(in: &cancellables)
         
-        // 监听会话变化（锁屏等）
+        // 监听锁屏 (使用 DistributedNotificationCenter)
+        distCenter.addObserver(forName: NSNotification.Name("com.apple.screenIsLocked"), 
+                              object: nil, 
+                              queue: .main) { [weak self] _ in
+            print("🔒 Screen locked (DistributedNotification)")
+            self?.wasLockedOrSleeping = true
+            self?.currentState = .idle
+        }
+        
+        // 监听解锁
+        distCenter.addObserver(forName: NSNotification.Name("com.apple.screenIsUnlocked"), 
+                              object: nil, 
+                              queue: .main) { [weak self] _ in
+            print("🔓 Screen unlocked (DistributedNotification)")
+            self?.wasLockedOrSleeping = true
+            self?.currentState = .active
+        }
+        
+        // 监听屏幕保护启动
+        distCenter.addObserver(forName: NSNotification.Name("com.apple.screensaver.didstart"), 
+                              object: nil, 
+                              queue: .main) { [weak self] _ in
+            print("🖼️ Screen saver started")
+            self?.wasLockedOrSleeping = true
+            self?.currentState = .idle
+        }
+        
+        // 监听屏幕保护停止
+        distCenter.addObserver(forName: NSNotification.Name("com.apple.screensaver.didstop"), 
+                              object: nil, 
+                              queue: .main) { [weak self] _ in
+            print("🖼️ Screen saver stopped")
+            self?.wasLockedOrSleeping = true
+            self?.currentState = .active
+        }
+        
+        // 监听会话变化（备用检测）
         workspace.publisher(for: NSWorkspace.sessionDidResignActiveNotification)
             .sink { [weak self] _ in
-                print("🔒 Session resigned active (locked?)")
+                print("🔒 Session resigned active")
+                self?.wasLockedOrSleeping = true
                 self?.currentState = .idle
             }
             .store(in: &cancellables)

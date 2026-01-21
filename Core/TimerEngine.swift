@@ -51,6 +51,7 @@ class TimerEngine: ObservableObject {
     // Snooze 结束但用户闲置的标记
     private var snoozeEndedWhileIdle: Bool = false
     private var snoozeCountAfterSnooze: Int = 0
+    private var pausedTickCount: Int = 0
     
     // MARK: - Lifecycle
     
@@ -100,9 +101,13 @@ class TimerEngine: ObservableObject {
             print("▶️ TimerEngine started")
         }
         
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        // Create timer with fire date 1 second in the future to prevent immediate firing
+        let newTimer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.tick()
         }
+        newTimer.fireDate = Date(timeIntervalSinceNow: 1.0)
+        RunLoop.main.add(newTimer, forMode: .common)
+        timer = newTimer
     }
     
     /// 停止计时器
@@ -250,11 +255,12 @@ class TimerEngine: ObservableObject {
                 state = .paused(reason: .idle)
                 // 保存当前进度
                 currentActiveSeconds = activeSeconds
-                print("⏸️ Timer paused (idle), progress saved: \(activeSeconds)s")
+                print("⏸️ Timer paused (idle), progress saved: \(activeSeconds)s, wasLockedOrSleeping: \(activityMonitor?.wasLockedOrSleeping ?? false)")
             }
             
         case .paused(let reason):
             if activityState == .active {
+                print("🔍 Checking resume: reason=\(reason), wasLockedOrSleeping=\(activityMonitor?.wasLockedOrSleeping ?? false)")
                 // Check if this is a resume from lock/sleep
                 if let monitor = activityMonitor, monitor.wasLockedOrSleeping {
                     // 从锁定或睡眠恢复，重置计时器（假设用户已经离开活动了）
@@ -280,6 +286,19 @@ class TimerEngine: ObservableObject {
     
     /// 计时器 tick（每秒调用）
     private func tick() {
+        // Log every 30 seconds in running state, or always for paused
+        if case .running(let activeSeconds, _) = state, activeSeconds % 30 == 0 {
+            print("⏱️ Tick: state=running(\(activeSeconds)s)")
+        } else if case .paused(let reason) = state {
+            // Only log first few ticks when paused to avoid spam
+            if pausedTickCount < 3 {
+                print("⏸️ Tick: state=paused(\(reason))")
+                pausedTickCount += 1
+            }
+        } else {
+            pausedTickCount = 0  // Reset counter when not paused
+        }
+        
         switch state {
         case .running(let activeSeconds, let targetSeconds):
             let newActiveSeconds = activeSeconds + 1
