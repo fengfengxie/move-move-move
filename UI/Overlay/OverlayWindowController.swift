@@ -70,8 +70,8 @@ class OverlayWindowController: NSWindowController {
         
         switch contentType {
         case .alert(let snoozeCount):
-            // 显示提醒卡片，snoozeCount >= 2 时隐藏 Snooze 按钮
-            let showSnooze = snoozeCount < 2
+            // 显示提醒卡片，snoozeCount >= 1 时隐藏 Snooze 按钮
+            let showSnooze = snoozeCount < 1
             contentView = AnyView(
                 OverlayContentView(
                     content: .alert,

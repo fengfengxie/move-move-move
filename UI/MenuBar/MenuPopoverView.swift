@@ -140,8 +140,8 @@ struct MenuPopoverView: View {
                     .foregroundColor(.secondary)
                 HStack(spacing: 8) {
                     intervalButton(minutes: 45)
-                    intervalButton(minutes: 60)
-                    intervalButton(minutes: 90)
+                    intervalButton(minutes: 50)
+                    intervalButton(minutes: 55)
                 }
             }
             

@@ -16,6 +16,7 @@ class ActivityMonitor: ObservableObject {
     // MARK: - Published Properties
     
     @Published private(set) var currentState: ActivityState = .active
+    @Published private(set) var wasLockedOrSleeping: Bool = false
     
     // MARK: - Settings
     
@@ -97,6 +98,7 @@ class ActivityMonitor: ObservableObject {
         workspace.publisher(for: NSWorkspace.didWakeNotification)
             .sink { [weak self] _ in
                 print("🌅 System woke up")
+                self?.wasLockedOrSleeping = true
                 self?.currentState = .active
             }
             .store(in: &cancellables)
@@ -120,6 +122,7 @@ class ActivityMonitor: ObservableObject {
         workspace.publisher(for: NSWorkspace.sessionDidBecomeActiveNotification)
             .sink { [weak self] _ in
                 print("🔓 Session became active")
+                self?.wasLockedOrSleeping = true
                 self?.currentState = .active
             }
             .store(in: &cancellables)
