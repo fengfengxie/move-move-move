@@ -89,12 +89,8 @@ class TimerEngine: ObservableObject {
     func start() {
         guard timer == nil else { return }
         
-        // Check if waking from lock/sleep - if so, always start fresh
-        if let monitor = activityMonitor, monitor.wasLockedOrSleeping {
-            print("▶️ TimerEngine started after lock/sleep - resetting")
-            state = .running(activeSeconds: 0, targetSeconds: intervalSeconds)
-            monitor.resetLockOrSleepFlag()
-        } else if let monitor = activityMonitor, monitor.currentState == .idle {
+        // Start based on current activity state
+        if let monitor = activityMonitor, monitor.currentState == .idle {
             state = .paused(reason: .idle)
             print("▶️ TimerEngine started (but paused due to idle state)")
         } else {
@@ -252,26 +248,26 @@ class TimerEngine: ObservableObject {
         switch state {
         case .running(let activeSeconds, _):
             if activityState == .idle {
-                // User became idle, pause and save progress
-                state = .paused(reason: .idle)
-                currentActiveSeconds = activeSeconds
-                print("⏸️ Timer paused (idle)")
+                // Check if this is a lock/sleep event
+                if let monitor = activityMonitor, monitor.wasLockedOrSleeping {
+                    // Lock/sleep detected: reset to 0 and pause
+                    print("🔒 Lock/sleep detected - resetting timer to 0 and pausing")
+                    currentActiveSeconds = 0
+                    state = .paused(reason: .locked)
+                    monitor.resetLockOrSleepFlag()
+                } else {
+                    // Normal idle: pause and save progress
+                    state = .paused(reason: .idle)
+                    currentActiveSeconds = activeSeconds
+                    print("⏸️ Timer paused (idle)")
+                }
             }
             
         case .paused(let reason):
             if activityState == .active {
-                print("🔍 Resuming from paused: reason=\(reason), wasLockedOrSleeping=\(activityMonitor?.wasLockedOrSleeping ?? false)")
-                // Check if resuming from lock/sleep or idle
-                if let monitor = activityMonitor, monitor.wasLockedOrSleeping {
-                    // Reset timer on resume from lock/sleep
-                    print("🔄 RESETTING timer after lock/sleep")
-                    resetCycle()
-                    monitor.resetLockOrSleepFlag()
-                } else {
-                    // Resume from normal idle, continue previous progress
-                    print("▶️ Resuming timer from idle (continuing from \(currentActiveSeconds)s)")
-                    state = .running(activeSeconds: currentActiveSeconds, targetSeconds: intervalSeconds)
-                }
+                // Resume from pause - just continue from current progress
+                print("▶️ Resuming timer from \(reason) (continuing from \(currentActiveSeconds)s)")
+                state = .running(activeSeconds: currentActiveSeconds, targetSeconds: intervalSeconds)
             }
             
         case .snoozing(_, _):
