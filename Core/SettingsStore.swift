@@ -95,6 +95,7 @@ class SettingsStore: ObservableObject {
     
     /// 记录一次休息
     func recordBreak() {
+        checkAndResetDailyCount()
         breaksToday += 1
         lastBreakDate = Date()
         print("📝 Break recorded, total today: \(breaksToday)")

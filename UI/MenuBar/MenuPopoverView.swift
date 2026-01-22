@@ -314,6 +314,9 @@ struct MenuPopoverView: View {
     }
     
     private func startUpdaters() {
+        // 检查并重置每日计数（处理跨天情况）
+        settingsStore.checkAndResetDailyCount()
+
         // 启动定时器更新 UI
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
             updateTimerInfo()

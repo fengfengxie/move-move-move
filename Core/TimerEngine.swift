@@ -221,7 +221,15 @@ class TimerEngine: ObservableObject {
     /// 设置设置变化监听
     private func setupSettingsObserver() {
         guard let settings = settingsStore else { return }
-        
+
+        // 监听 breaksToday 变化（保持同步）
+        settings.$breaksToday
+            .sink { [weak self] count in
+                guard let self = self else { return }
+                self.breaksToday = count
+            }
+            .store(in: &cancellables)
+
         // 监听 interval 变化（仅在非开发模式下）
         if !Self.developmentMode {
             settings.$intervalMinutes
@@ -235,7 +243,7 @@ class TimerEngine: ObservableObject {
                     }
                 }
                 .store(in: &cancellables)
-            
+
             // 监听 break duration 变化
             settings.$breakSeconds
                 .sink { [weak self] seconds in
@@ -434,10 +442,9 @@ class TimerEngine: ObservableObject {
     
     /// 完成一次休息
     private func completeBreak() {
-        breaksToday += 1
         state = .breakCompleted
-        
-        // 记录到 SettingsStore 进行持久化
+
+        // 记录到 SettingsStore 进行持久化（breaksToday 通过 Combine 同步）
         settingsStore?.recordBreak()
         
         print("✅ Break completed! Total today: \(breaksToday)")
