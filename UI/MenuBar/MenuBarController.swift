@@ -4,6 +4,7 @@ import SwiftUI
 class MenuBarController: NSObject {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
+    private var eventMonitor: EventMonitor?
     var activityMonitor: ActivityMonitor?
     var timerEngine: TimerEngine?
     var settingsStore: SettingsStore?
@@ -12,6 +13,7 @@ class MenuBarController: NSObject {
         super.init()
         setupStatusItem()
         setupPopover()
+        setupEventMonitor()
     }
     
     private func setupStatusItem() {
@@ -31,7 +33,16 @@ class MenuBarController: NSObject {
         popover = NSPopover()
         popover?.contentSize = NSSize(width: 320, height: 250)
         popover?.behavior = .transient
+        popover?.delegate = self
         updatePopoverContent()
+    }
+    
+    private func setupEventMonitor() {
+        eventMonitor = EventMonitor(mask: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            if let popover = self?.popover, popover.isShown {
+                self?.closePopover()
+            }
+        }
     }
     
     private func updatePopoverContent() {
@@ -48,15 +59,54 @@ class MenuBarController: NSObject {
     @objc private func togglePopover() {
         guard let popover = popover, let button = statusItem?.button else { return }
         
-        // 每次打开时更新内容以确保传递最新的 timerEngine
-        if !popover.isShown {
-            updatePopoverContent()
-        }
-        
         if popover.isShown {
-            popover.performClose(nil)
+            closePopover()
         } else {
+            // 每次打开时更新内容以确保传递最新的 timerEngine
+            updatePopoverContent()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            eventMonitor?.start()
+        }
+    }
+    
+    private func closePopover() {
+        popover?.performClose(nil)
+        eventMonitor?.stop()
+    }
+}
+
+// MARK: - NSPopoverDelegate
+
+extension MenuBarController: NSPopoverDelegate {
+    func popoverDidClose(_ notification: Notification) {
+        eventMonitor?.stop()
+    }
+}
+
+// MARK: - Event Monitor Helper
+
+class EventMonitor {
+    private var monitor: Any?
+    private let mask: NSEvent.EventTypeMask
+    private let handler: (NSEvent?) -> Void
+    
+    init(mask: NSEvent.EventTypeMask, handler: @escaping (NSEvent?) -> Void) {
+        self.mask = mask
+        self.handler = handler
+    }
+    
+    deinit {
+        stop()
+    }
+    
+    func start() {
+        monitor = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: handler)
+    }
+    
+    func stop() {
+        if let monitor = monitor {
+            NSEvent.removeMonitor(monitor)
+            self.monitor = nil
         }
     }
 }
