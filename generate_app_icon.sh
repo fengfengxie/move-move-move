@@ -4,7 +4,8 @@
 set -e
 
 cd "$(dirname "$0")"
-ICON_DIR="Resources/Assets.xcassets/AppIcon.appiconset"
+ICONSET_DIR="Resources/Assets.xcassets/AppIcon.appiconset"
+ICON_OUTPUT="Resources/AppIcon.icns"
 
 echo "🎨 生成App图标（基于SF Symbol figure.walk）..."
 
@@ -101,12 +102,12 @@ fi
 
 # 使用iconutil生成.icns文件
 echo "  生成 .icns 文件..."
-iconutil -c icns "$ICON_DIR/temp.iconset" -o "Resources/Assets.xcassets/AppIcon.icns"
+iconutil -c icns "$ICONSET_DIR/temp.iconset" -o "$ICON_OUTPUT"
 
 # 清理临时文件
-rm -rf "$ICON_DIR/temp.iconset"
+rm -rf "$ICONSET_DIR/temp.iconset"
 rm -f temp_icon_1024.png
 
 echo "✅ App图标生成完成！"
-echo "   位置: Resources/Assets.xcassets/AppIcon.icns"
-ls -lh Resources/Assets.xcassets/AppIcon.icns
+echo "   位置: $ICON_OUTPUT"
+ls -lh "$ICON_OUTPUT"

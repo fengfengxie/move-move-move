@@ -31,7 +31,9 @@ MoveApp/
 │       ├── AlertCardView.swift
 │       └── BreakCardView.swift
 └── Resources/
-    └── Assets.xcassets
+    ├── AppIcon.icns
+    └── Assets.xcassets/
+        └── AppIcon.appiconset/
 ```
 
 ## 🚀 Building & Installation

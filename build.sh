@@ -40,9 +40,16 @@ if [ "$MODE" = "release" ] || [ "$MODE" = "package" ]; then
     chmod +x "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
     
     # Copy resources
-    if [ -f "Resources/Assets.xcassets/AppIcon.icns" ]; then
-        cp "Resources/Assets.xcassets/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/"
-        echo "✓ App icon copied"
+    ICON_SOURCE=""
+    if [ -f "Resources/AppIcon.icns" ]; then
+        ICON_SOURCE="Resources/AppIcon.icns"
+    elif [ -f "Resources/Assets.xcassets/AppIcon.icns" ]; then
+        # Backward compatibility with the previous icon location.
+        ICON_SOURCE="Resources/Assets.xcassets/AppIcon.icns"
+    fi
+    if [ -n "$ICON_SOURCE" ]; then
+        cp "$ICON_SOURCE" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+        echo "✓ App icon copied from $ICON_SOURCE"
     fi
     
     # Create Info.plist
