@@ -202,12 +202,7 @@ Available settings (adjust in menu popover):
 
 ## 🖼️ Screenshots
 
-Add screenshots to the [MoveApp/Resources/Screenshots](MoveApp/Resources/Screenshots) folder:
-
-- menu-popover.png
-- overlay-alert.png
-- break-countdown.png
-- completion-state.png
+![Move!Move!Move! Demo](move-demo.png)
 
 ## 📄 License
 
