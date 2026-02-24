@@ -2,6 +2,10 @@
 
 A macOS Menu Bar application that reminds you to take regular breaks and move around during long work sessions.
 
+## 🖼️ Screenshots
+
+![Move!Move!Move! Demo](move-demo.png)
+
 ## 🎯 Features
 
 - **Screen Activity Monitoring**: Tracks continuous screen usage time
@@ -199,10 +203,6 @@ Available settings (adjust in menu popover):
 - No internet connection required
 - All processing happens locally
 - No tracking or analytics
-
-## 🖼️ Screenshots
-
-![Move!Move!Move! Demo](move-demo.png)
 
 ## 📄 License
 
